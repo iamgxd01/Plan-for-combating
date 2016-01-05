@@ -9,7 +9,7 @@ headers = {
 }
 
 # 使用 format(str(i)) for i in range(1, 4)获得多个网页
-urls = ['http://m.58.com/bj/pbdn/pn{}/?reform=pcfront&PGTID=0d305a36-0000-140a-35f7-6753843b0650&ClickID=2&segment=true'.format(str(i)) for i in range(1, 4)]
+urls = ['http://m.58.com/bj/pbdn/pn{}/?reform=pcfront&PGTID=0d305a36-0000-140a-35f7-6753843b0650&ClickID=2&segment=true'.format(str(i)) for i in range(1, 3)]
 
 
 # 获得单个商品的基本信息
@@ -17,22 +17,15 @@ def get_detail_info(url, detail_info=None):
     wb_data = requests.get(url, headers=headers)
     soup = BeautifulSoup(wb_data.text, 'lxml')
     titles = soup.select('  div.left_tit > h1')
-    page_views = soup.select('div.good_info > div > div:nth-of-type(2) > lable')
     release_times = soup.select(' div.date')
     prices = soup.select(' p.attr_price > span ')
     seller_types = soup.select('#personal > span.pcate')
     areas = soup.select('div.location > a')
-    categorys = soup.select('#header > div.breadCrumb.f12 > span:nth-of-type(3) > a ')
-    url_js = soup.select('head > script:nth-of-type(33)')
-    print(page_views)
-    print(url_js[0].get('src'))
-
-
     if detail_info is None:
-        for title,  page_view,  release_time, price,  seller_type, area, in zip(titles, page_views,  release_times, prices, seller_types, areas, ):
+        for title,  release_time, price,  seller_type, area, in zip(titles ,  release_times, prices, seller_types, areas, ):
             detail_info = {
                 'title': title.get_text(),
-                'page_view': page_view.get_text(),
+                'page_view': get_page_view(url),
                 'release_time': release_time.get_text(strip=True),
                 'price': price.get_text(),
                 'seller_type': seller_type.get_text(),
@@ -60,6 +53,34 @@ def get_list_info(url, data_list= None):
             # 其他两种使用detail_info()方法获得数据
             if url_type == -1:
                 data.append(get_detail_info(url_str))
+
+
+# 获得page_view
+# 思路：查看网页的源代码，浏览量的值为0 审查元素看到的游览量不为空可判断为该值是通过js获得的
+# 点击network 刷新网页，观察哪个url的response 返回的值包含浏览量
+# 观察得到http://jst1.58.com/counter?infoid={}
+# 接下来就是拼接 url 解析数据
+def get_page_view(url):
+
+    # 根据 url 中的entinfo索引值获得 entinfo的值，它的值等于infoid
+    entinfo_index = url.find('entinfo')
+    infoid = url[entinfo_index+8:entinfo_index+22]
+    # 根据infoid 拼接 获得 page_view 需要的url
+    page_view_url = 'http://jst1.58.com/counter?infoid={}'.format(infoid)
+
+    # 解析数据
+    page_view_data = requests.get(page_view_url,)
+    page_view_soup = BeautifulSoup(page_view_data.text,'lxml')
+
+    page_views = page_view_soup.select('p')
+    page_view_str = page_views[0].get_text().split(';')[1]
+    page_view_index = page_view_str.find('=')
+    page_view_length = len(page_view_str)
+    page_view = page_view_str[page_view_index+1:page_view_length]
+    print('infoid:'+infoid)
+    print('浏览量:'+page_view)
+
+    return page_view
 
 # 获取多个网页的数据
 for url in urls:
